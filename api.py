@@ -8,7 +8,6 @@ import os
 import cv2
 import wget
 wget.download('http://bit.ly/malariaweight')
-os.rename('malaria','malaria.h5')
 app = Flask(__name__)
 
 model = torch.load('malaria.h5' , map_location='cpu')
