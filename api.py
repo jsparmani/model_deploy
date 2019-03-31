@@ -10,7 +10,6 @@ import wget
 wget.download('http://bit.ly/malariaweight')
 app = Flask(__name__)
 
-model = torch.load('malaria.h5' , map_location='cpu')
 @app.route("/")
 @app.route("/index")
 def index():
@@ -38,6 +37,6 @@ def make_prediction():
 
 if __name__ == '__main__':
 	# load ml model
-	model = joblib.load('model.pkl')
+	model = torch.load('malaria.h5' , map_location='cpu')
 	# start api
 	app.run(host='0.0.0.0', port=8000, debug=True)
