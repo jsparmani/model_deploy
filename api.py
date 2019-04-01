@@ -39,4 +39,4 @@ if __name__ == '__main__':
 	# load ml model
 	model = torch.load('malaria.h5' , map_location='cpu')
 	# start api
-	app.run(host='0.0.0.0', port=8000, debug=True)
+	app.run(host='0.0.0.0', port=8888, debug=True)
