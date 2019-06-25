@@ -54,7 +54,7 @@ def prediction_bar(output,encoder):
     plt.title("Confidence score bar graph")
     plt.xlabel("Confidence score")
     plt.ylabel("Class number")
-    plt.savefig('templates/pred_bar.png')
+    plt.savefig('templates/pred_bar.jpg')
     
 class classifie(nn.Module):
     def __init__(self):
@@ -109,7 +109,7 @@ def model_predict(image_path):
     pred = classifier(image)
     return sm(pred)
 
-pred = model_predict('stylize.jpg')
+
 
 @app.route('/', methods=['GET'])
 def index():
@@ -133,8 +133,8 @@ def upload():
         pred = model_predict(file_path)
         result = np.argmax(pred.detach().numpy())
         result = encoder[int(result)]
-        #prediction_bar(pred,encoder)
-        return result
+        prediction_bar(pred,encoder)
+        return render_template('output.html')
     return None
 
 
