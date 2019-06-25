@@ -21,7 +21,7 @@ from torchvision import models
 app = Flask(__name__)
 
 # Model saved with Keras model.save()
-MODEL_PATH = 'models/classifier1.h5'
+MODEL_PATH = 'models/classifier.h5'
 classes = ['buildings', 'forest', 'glacier', 'mountain', 'sea', 'street']
 
 decoder = {}
@@ -56,36 +56,26 @@ def prediction_bar(output,encoder):
     plt.ylabel("Class number")
     plt.savefig('templates/pred_bar.jpg')
     
-class classifie(nn.Module):
+#using efficientnet model based transfer learning
+class Classifier(nn.Module):
     def __init__(self):
-        super(classifie, self).__init__()
-        model = models.densenet121()
-        model = model.features
-        #model = EfficientNet.from_pretrained('efficientnet-b3')
-        #model =  nn.Sequential(*list(model.children())[:-3])
-        self.model = model
-        self.linear = nn.Linear(2048, 512)
-        self.bn = nn.BatchNorm1d(512)
-        self.dropout = nn.Dropout(0.2)
-        self.elu = nn.ELU()
-        self.out = nn.Linear(512, 6)
-        self.bn1 = nn.BatchNorm1d(2048)
-        self.dropout2 = nn.Dropout(0.2)
-    def forward(self, x):
-        out = self.model(x)
-        avg_pool = nn.functional.adaptive_avg_pool2d(out, output_size = 1)
-        max_pool = nn.functional.adaptive_max_pool2d(out, output_size = 1)
-        out = torch.cat((avg_pool,max_pool),1)
-        batch = out.shape[0]
-        out = out.view(batch, -1)
-        conc = self.linear(self.dropout2(self.bn1(out)))
-        conc = self.elu(conc)
-        conc = self.bn(conc)
-        conc = self.dropout(conc)
-        res = self.out(conc)
-        return res    
+        super(Classifier, self).__init__()
+        self.resnet =  EfficientNet.from_name('efficientnet-b0')
+        self.l1 = nn.Linear(1000 , 256)
+        self.dropout = nn.Dropout(0.75)
+        self.l2 = nn.Linear(256,6)
+        self.relu = nn.ReLU()
 
-classifier = classifie()
+    def forward(self, input):
+        x = self.resnet(input)
+        x = x.view(x.size(0),-1)
+        x = self.dropout(self.relu(self.l1(x)))
+        x = self.l2(x)
+        return x
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+classifier = Classifier().to(device)
+
 classifier.load_state_dict(torch.load(MODEL_PATH,map_location=lambda storage, loc: storage))
 
 classifier.eval()
