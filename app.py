@@ -7,18 +7,21 @@ import re
 import numpy as np
 import torch
 from torch import nn
+import cv2
 # Flask utils
 from flask import Flask, redirect, url_for, request, render_template
 from werkzeug.utils import secure_filename
 from gevent.pywsgi import WSGIServer
 from torchvision import transforms
-from efficientnet_pytorch import EfficientNet
+import matplotlib.pyplot as plt
+from efficientnet_pytorch import  EfficientNet
+from torchvision import models
 
 # Define a flask app
 app = Flask(__name__)
 
 # Model saved with Keras model.save()
-MODEL_PATH = 'models/classifier.h5'
+MODEL_PATH = 'models/classifier1.h5'
 classes = ['buildings', 'forest', 'glacier', 'mountain', 'sea', 'street']
 
 decoder = {}
@@ -27,24 +30,62 @@ for i in range(len(classes)):
 encoder = {}
 for i in range(len(classes)):
     encoder[i] = classes[i]
+sm = nn.Softmax()
 
+def prediction_bar(output,encoder):
+    output = output.cpu().detach().numpy()
+    a = output.argsort()
+    a = a[0]
+
+    size = len(a)
+    if(size>5):
+        a = np.flip(a[-5:])
+    else:
+        a = np.flip(a[-1*size:])
+    prediction = list()
+    clas = list()
+    for i in a:
+      prediction.append(float(output[:,i]*100))
+      clas.append(str(i))
+    cl = list()
+    for i in a:
+        cl.append(encoder[int(i)])
+    plt.bar(cl,prediction)
+    plt.title("Confidence score bar graph")
+    plt.xlabel("Confidence score")
+    plt.ylabel("Class number")
+    plt.savefig('templates/pred_bar.png')
     
-class Classifier(nn.Module):
+class classifie(nn.Module):
     def __init__(self):
-        super(Classifier, self).__init__()
-        self.resnet =  EfficientNet.from_name('efficientnet-b0')
-        self.l1 = nn.Linear(1000 , 256)
-        self.dropout = nn.Dropout(0.75)
-        self.l2 = nn.Linear(256,6)
-        self.relu = nn.ReLU()
+        super(classifie, self).__init__()
+        model = models.densenet121()
+        model = model.features
+        #model = EfficientNet.from_pretrained('efficientnet-b3')
+        #model =  nn.Sequential(*list(model.children())[:-3])
+        self.model = model
+        self.linear = nn.Linear(2048, 512)
+        self.bn = nn.BatchNorm1d(512)
+        self.dropout = nn.Dropout(0.2)
+        self.elu = nn.ELU()
+        self.out = nn.Linear(512, 6)
+        self.bn1 = nn.BatchNorm1d(2048)
+        self.dropout2 = nn.Dropout(0.2)
+    def forward(self, x):
+        out = self.model(x)
+        avg_pool = nn.functional.adaptive_avg_pool2d(out, output_size = 1)
+        max_pool = nn.functional.adaptive_max_pool2d(out, output_size = 1)
+        out = torch.cat((avg_pool,max_pool),1)
+        batch = out.shape[0]
+        out = out.view(batch, -1)
+        conc = self.linear(self.dropout2(self.bn1(out)))
+        conc = self.elu(conc)
+        conc = self.bn(conc)
+        conc = self.dropout(conc)
+        res = self.out(conc)
+        return res    
 
-    def forward(self, input):
-        x = self.resnet(input)
-        x = x.view(x.size(0),-1)
-        x = self.dropout(self.relu(self.l1(x)))
-        x = self.l2(x)
-        return x
-classifier = Classifier()
+classifier = classifie()
 classifier.load_state_dict(torch.load(MODEL_PATH,map_location=lambda storage, loc: storage))
 
 classifier.eval()
@@ -65,10 +106,10 @@ def im_convert(image_path):
 def model_predict(image_path):
     image = im_convert(image_path)
     image = image.type(torch.FloatTensor)
-    pred = model(image)
-    pred = np.argmax(pred.detach().numpy())
-    return encoder[int(pred)]
+    pred = classifier(image)
+    return sm(pred)
 
+pred = model_predict('stylize.jpg')
 
 @app.route('/', methods=['GET'])
 def index():
@@ -89,9 +130,11 @@ def upload():
         f.save(file_path)
 
         # Make prediction
-        result = model_predict(file_path)
-
-        return str(result)
+        pred = model_predict(file_path)
+        result = np.argmax(pred.detach().numpy())
+        result = encoder[int(result)]
+        #prediction_bar(pred,encoder)
+        return result
     return None
 
 
