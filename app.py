@@ -133,8 +133,8 @@ def upload():
         pred = model_predict(file_path)
         result = np.argmax(pred.detach().numpy())
         result = encoder[int(result)]
-        prediction_bar(pred,encoder)
-        return render_template('output.html')
+        #prediction_bar(pred,encoder)
+        return result
     return None
 
 
